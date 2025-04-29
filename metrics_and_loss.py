@@ -32,7 +32,7 @@ class CombinedLoss(tf.keras.losses.Loss):
         base_config = super().get_config()
         return {**base_config, 'smooth': self.smooth, 'alpha': self.alpha}
 
-@keras.saving.register_keras_serializable(package="CustomMetrics")
+@keras.saving.register_keras_serializable(package="CustomIoU")
 class IoUMetric(tf.keras.metrics.Metric):
     """
     Métrique personnalisée pour calculer l'IoU (Intersection over Union)
@@ -64,8 +64,7 @@ class IoUMetric(tf.keras.metrics.Metric):
     def reset_state(self):
         self.iou_sum.assign(0.0)
         self.total_samples.assign(0.0)
-    
+        
     def get_config(self):
         base_config = super().get_config()
-        return base_config
-
+        return {**base_config, 'name': self.name}
