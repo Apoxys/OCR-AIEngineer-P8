@@ -68,3 +68,43 @@ class IoUMetric(tf.keras.metrics.Metric):
     def get_config(self):
         base_config = super().get_config()
         return {**base_config, 'name': self.name}
+
+@keras.saving.register_keras_serializable(package="Custom_MIoU")
+class M_IoUMetric(tf.keras.metrics.Metric):
+    """
+    Métrique personnalisée pour calculer l'IoU (Intersection over Union)
+    adaptée pour la segmentation d'images.
+    """
+    def __init__(self, name='iou', **kwargs):
+        super().__init__(name=name, **kwargs)
+        # Il est préférable d'accumuler les intersections et les unions globales
+        # pour un calcul d'IoU moyenne plus stable.
+        self.total_intersection = self.add_weight(name='total_intersection', initializer='zeros')
+        self.total_union = self.add_weight(name='total_union', initializer='zeros')
+        
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        # Convertir les prédictions en binaire (0/1) après un seuil
+        # y_pred est la sortie softmax du modèle, y_true est one-hot
+        # Pour une IoU multiclasse par pixel, on peut considérer chaque canal comme une classe binaire
+        y_pred = tf.cast(tf.greater(y_pred, 0.5), tf.float32) 
+        y_true = tf.cast(y_true, tf.float32) # Assurer que y_true est aussi float32
+
+        # Calculer intersection et union par classe et par batch, puis sommer globalement
+        intersection = tf.reduce_sum(y_true * y_pred, axis=[1, 2, 3]) # Somme sur H, W, C
+        union = tf.reduce_sum(y_true + y_pred, axis=[1, 2, 3]) - intersection # Somme sur H, W, C
+        
+        # Accumuler les sommes globales
+        self.total_intersection.assign_add(tf.reduce_sum(intersection))
+        self.total_union.assign_add(tf.reduce_sum(union))
+
+    def result(self):
+        # Éviter la division par zéro en ajoutant un epsilon
+        return self.total_intersection / (self.total_union + tf.keras.backend.epsilon())
+            
+    def reset_state(self):
+        self.total_intersection.assign(0.0)
+        self.total_union.assign(0.0)
+            
+    def get_config(self):
+        base_config = super().get_config()
+        return {**base_config, 'name': self.name}
